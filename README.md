@@ -65,7 +65,7 @@ If you need to remove a label from a data set you can use another function in vo
 
 ## Video Demonstration:
 
-[<img src="https://img.youtube.com/vi/<VIDEO ID>/maxresdefault.jpg" width="50%">](https://youtu.be/rEyfXz5ceAk)
+[<img src="https://img.youtube.com/vi/rEyfXz5ceAk/maxresdefault.jpg" width="50%">](https://youtu.be/rEyfXz5ceAk)
 
 
 
