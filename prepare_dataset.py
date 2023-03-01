@@ -1,6 +1,9 @@
 """
 PASCAL VOC Data Tools
-by https://github.com/cyberduderino
+
+This script converts Dark Label VOC data sets to the correct format and structure for PASCAL VOC.
+
+by @0xtommyOfficial, molmez.io
 01/Feb/2022
 """
 import argparse
