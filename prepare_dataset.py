@@ -1,7 +1,8 @@
 """
 PASCAL VOC Data Tools
 
-This script converts Dark Label VOC data sets to the correct format and structure for PASCAL VOC.
+This script converts Dark Label VOC data sets to the correct format and structure for PASCAL VOC
+This script also allows for the injection of negatives into the data set to experiment with.
 
 by @0xtommyOfficial, molmez.io
 01/Feb/2022
