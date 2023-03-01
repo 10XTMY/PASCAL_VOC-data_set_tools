@@ -1,7 +1,5 @@
 # PASCAL_VOC-data_set_tools
 
-This is my first ever contribution to the world via GitHub so if I do anything incorrectly please just drop me some constructive feedback :D Thank You.
-
 - Correct Dark Label VOC datasets for nvidia jetson inference training.
 - Inject new data sets into existing ones.
 - Generate and inject negative data sets into an existing VOC set.
