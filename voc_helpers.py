@@ -1,7 +1,7 @@
 """
-PASCAL VOC Data Tools
-by @10XTMY, molmez.io
-01/Feb/2022
+Helper functions for PASCAL VOC Data Set Tools (see prepare_dataset.py)
+MIT License
+Copyright (c) 2023 @10XTMY, molmez.io
 """
 import os
 import sys
