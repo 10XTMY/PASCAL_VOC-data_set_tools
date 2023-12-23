@@ -132,28 +132,29 @@ def remove_object_from_xml_files(xml_directory, object_names_set):
     """
     for dir_path, _, files in os.walk(xml_directory):
         for xml_file in tqdm.tqdm(files):
-            xml_path = os.path.join(dir_path, xml_file)
             if not xml_file.lower().endswith('.xml'):
                 continue
+
+            xml_path = os.path.join(dir_path, xml_file)
 
             try:
                 tree = ElementTree.parse(xml_path)
                 tree_root = tree.getroot()
-                objects = tree_root.findall("object")
 
-                for obj in objects:
-                    if obj.find('name').text in object_names_set:
-                        tree_root.remove(obj)
+                # collect items to be removed to avoid modifying the list while iterating over it
+                objects_to_remove = [obj for obj in tree_root.findall("object")
+                                     if obj.find('name') is not None and obj.find('name').text in object_names_set]
 
-                tree.write(xml_path)
+                for obj in objects_to_remove:
+                    tree_root.remove(obj)
+
+                if objects_to_remove:
+                    tree.write(xml_path)
 
             except ElementTree.ParseError as e:
-                print(f"Error parsing {xml_file}: {e}")
-                sys.exit(1)
-            except Exception as e:
-                print(f"Error processing {xml_file}: {e}")
-                traceback.print_tb(e.__traceback__)
-                sys.exit(1)
+                raise ElementTree.ParseError(f"Error parsing {xml_file}: {e}")
+            except IOError as e:
+                raise IOError(f"Error writing changes to {xml_file}: {e}")
 
 
 def fix_missing_xml_object_name(xml_directory, label_text):
