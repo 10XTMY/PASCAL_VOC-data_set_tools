@@ -163,31 +163,31 @@ def fix_missing_xml_object_name(xml_directory, label_text):
     :param xml_directory: directory of xml files
     :param label_text: label to replace object name with
     """
-
     for dir_path, _, files in os.walk(xml_directory):
         for xml_file in tqdm.tqdm(files):
-            xml_path = os.path.join(dir_path, xml_file)
             if not xml_file.lower().endswith('.xml'):
                 continue
+
+            xml_path = os.path.join(dir_path, xml_file)
 
             try:
                 tree = ElementTree.parse(xml_path)
                 objects = tree.findall("object")
+                updated = False
 
                 for obj in objects:
                     class_name = obj.find('name')
                     if class_name is not None and class_name.text is None:
                         class_name.text = label_text
+                        updated = True
 
-                tree.write(xml_path)
+                if updated:
+                    tree.write(xml_path)
 
             except ElementTree.ParseError as e:
-                print(f"Error parsing {xml_file}: {e}")
-                sys.exit(1)
+                raise ElementTree.ParseError(f"Error parsing {xml_file}: {e}")
             except Exception as e:
-                print(f"Error processing {xml_file}: {e}")
-                traceback.print_tb(e.__traceback__)
-                sys.exit(1)
+                raise Exception(f"Error processing {xml_file}: {e}")
 
 
 def replace_xml_file_information(xml_file, replace_dict):
@@ -208,12 +208,9 @@ def replace_xml_file_information(xml_file, replace_dict):
         tree.write(xml_file)
 
     except ElementTree.ParseError as e:
-        print(f"Error parsing {xml_file}: {e}")
-        sys.exit(1)
+        raise ElementTree.ParseError(f'error parsing {xml_file}: {e}')
     except Exception as e:
-        print(f"Error processing {xml_file}: {e}")
-        traceback.print_tb(e.__traceback__)
-        sys.exit(1)
+        raise Exception(f'error processing {xml_file}: {e}')
 
 
 def generate_negative_data_set(existing_names, negative_images, negative_output_dir, xml_template):
@@ -266,7 +263,10 @@ def generate_negative_data_set(existing_names, negative_images, negative_output_
                     'xmax': str(width),
                     'ymax': str(height)
                 }
-                replace_xml_file_information(xml_path, replace_dict)
+                try:
+                    replace_xml_file_information(xml_path, replace_dict)
+                except Exception as e:
+                    raise Exception(f'error processing {xml_file}: {e}')
             except ElementTree.ParseError as e:
                 raise ElementTree.ParseError(f'error parsing {xml_file}: {e}')
 
@@ -421,7 +421,10 @@ def prepare_voc(input_directory, image_directory, annotations_directory, existin
                     xml_input_path = os.path.join(input_directory, xml_file_name)
                     replace_dict = {'filename': f'{new_filename}.jpg',
                                     'path': f'{new_filename}.jpg'}
-                    replace_xml_file_information(xml_input_path, replace_dict)
+                    try:
+                        replace_xml_file_information(xml_input_path, replace_dict)
+                    except Exception as e:
+                        raise Exception(f"Error processing {xml_file_name}: {e}")
 
                     # copy XML file
                     try:
