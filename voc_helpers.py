@@ -384,7 +384,7 @@ def inject_negative_data_set(negatives_dir, jpg_dir, annotations_dir, txt_dir, v
                 raise IOError(f'error copying {file} to {destination}: {e}')
     try:
         generate_txt_files(jpg_dir, txt_dir, val_test_percentage)
-    except Exception as e:
+    except (OSError, ValueError, IOError) as e:
         print(f'error generating txt files: {e}')
         traceback.print_tb(e.__traceback__)
         sys.exit(1)
@@ -425,7 +425,7 @@ def prepare_voc(input_directory, image_directory, annotations_directory, existin
 
                         try:
                             replace_xml_file_information(xml_input_path, replace_dict)
-                        except Exception as e:
+                        except (ElementTree.ParseError, Exception) as e:
                             raise Exception(f"Error replacing xml file information {xml_file_name}: {e}")
 
                         shutil.copy(xml_input_path, xml_path)

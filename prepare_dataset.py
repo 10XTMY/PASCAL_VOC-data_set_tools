@@ -93,7 +93,7 @@ if __name__ == "__main__":
             existing_names = collect_current_data_set(CURRENT_DATA_SET,
                                                       JPEG_DIR,
                                                       ANNOTATIONS_DIR)
-        except Exception as e:
+        except IOError as e:
             print(f'error collecting current data set: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
@@ -103,14 +103,14 @@ if __name__ == "__main__":
                         JPEG_DIR,
                         ANNOTATIONS_DIR,
                         existing_names)
-        except Exception as e:
+        except (IOError, Exception) as e:
             print(f'error preparing voc: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
 
         try:
             generate_txt_files(JPEG_DIR, TXT_DIR, 20)
-        except Exception as e:
+        except (OSError, ValueError, IOError) as e:
             print(f'error generating txt files: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
@@ -120,7 +120,7 @@ if __name__ == "__main__":
             existing_names = collect_current_data_set(CURRENT_DATA_SET,
                                                       JPEG_DIR,
                                                       ANNOTATIONS_DIR)
-        except Exception as e:
+        except IOError as e:
             print(f'error collecting current data set: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
@@ -130,7 +130,7 @@ if __name__ == "__main__":
                                        NEGATIVE_IMAGES,
                                        NEGATIVE_DATA_SET_OUTPUT,
                                        NEGATIVE_XML_TEMPLATE)
-        except Exception as e:
+        except (IOError, Exception) as e:
             print(f'error generating negative data set: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
@@ -141,7 +141,7 @@ if __name__ == "__main__":
                                      ANNOTATIONS_DIR,
                                      TXT_DIR,
                                      20)
-        except Exception as e:
+        except (OSError, ValueError, IOError) as e:
             print(f'error injecting negative data set: {e}')
             traceback.print_tb(e.__traceback__)
             sys.exit(1)
