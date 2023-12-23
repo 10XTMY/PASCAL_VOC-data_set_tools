@@ -419,8 +419,8 @@ def prepare_voc(input_directory, image_directory, annotations_directory, existin
                         rgb_img = img.convert('RGB')
                         rgb_img.save(jpg_path)
 
-                    # update and copy XML file if it exists and has not been copied yet
-                    if xml_file_name in files and xml_file_name not in existing_names:
+                    # update and copy XML file if it exists
+                    if xml_file_name in files:
                         replace_dict = {'filename': f'{new_filename}.jpg', 'path': f'{new_filename}.jpg'}
 
                         try:
