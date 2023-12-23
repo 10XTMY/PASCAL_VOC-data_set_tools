@@ -1,6 +1,6 @@
 """
 PASCAL VOC Data Tools
-by https://github.com/cyberduderino
+by @10XTMY, molmez.io
 01/Feb/2022
 """
 import os
@@ -8,6 +8,7 @@ import sys
 import traceback
 import random
 import string
+import secrets
 import shutil
 import tqdm
 import datetime
@@ -26,37 +27,32 @@ def get_time_date():
 
 def write_to_txt_file(filename, set_to_write, existing):
     """
-    appends data to existing txt file or writes data to a new one
+    Appends data to existing txt file or writes data to a new one
     :param filename:name of txt file to write
     :param set_to_write: set of data to write to txt file
     :param existing: does the file already exist?
     """
-    if existing:
-        mode = 'a'
-    else:
-        mode = 'w'
+    mode = 'a' if existing else 'w'
+
     try:
-        with open(filename, mode) as f:
-            for _line in set_to_write:
-                _to_write = _line.rsplit(".", 1)[0]
-                f.write(str(_to_write) + '\n')
-    except Exception as _err:
-        print(f'error writing {filename}: {_err} ')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
+        with open(filename, mode) as file:
+            for line in set_to_write:
+                to_write = line.rsplit(".", 1)[0]
+                file.write(f'{to_write}\n')
+    except IOError as err:
+        raise IOError(f"Error writing to {filename}: {err}") from err
     else:
         print(f'{filename} saved')
 
 
-def get_random_alphanum_str(length):
+def get_random_alphanum(length):
     """
-    generates random alphanumerical string
+    Generates a random alphanumerical string
     :param length: desired string length to be returned
-    :return: string
+    :return: a random alphanumerical string of the specified length.
     """
     letters_and_digits = string.ascii_letters + string.digits
-    result_str = ''.join((random.choice(letters_and_digits) for i in range(length)))
-    return result_str
+    return ''.join(secrets.choice(letters_and_digits) for _ in range(length))
 
 
 def partition_list(list_to_split, percent, shuffle):
@@ -66,10 +62,14 @@ def partition_list(list_to_split, percent, shuffle):
     :param shuffle: True to shuffle the list before splitting it
     :return: two lists, the first being the percentage of the original
     """
+    if not 0 <= percent <= 100:
+        raise ValueError("Percentage must be between 0 and 100")
+
     if shuffle:
         random.shuffle(list_to_split)
-    _split = round(len(list_to_split)*(percent/100))
-    return list_to_split[:_split], list_to_split[_split:]
+
+    split_index = round(len(list_to_split) * (percent / 100))
+    return list_to_split[:split_index], list_to_split[split_index:]
 
 
 def split_list_in_half(list_to_split):
@@ -77,19 +77,23 @@ def split_list_in_half(list_to_split):
     :param list_to_split: input list
     :return: two lists, input list split in half
     """
-    return list_to_split[::2], list_to_split[1::2]
+    middle = len(list_to_split) // 2
+    return list_to_split[:middle], list_to_split[middle:]
 
 
-def get_new_file_name(existing_names):
+def get_new_file_name(existing_names, length=15, max_attempts=100000):
     """
     :param existing_names: list of existing file names to avoid conflict
+    :param length: desired length of new file name
+    :param max_attempts: maximum number of attempts before giving up
     :return: new filename
     """
-    _filename = get_random_alphanum_str(15)
-    if f'{_filename}' in existing_names:
-        while f'{_filename}' in existing_names:
-            _filename = get_random_alphanum_str(15)
-    return _filename
+    for _ in range(max_attempts):
+        filename = get_random_alphanum(length)
+        if filename not in existing_names:
+            return filename
+
+    raise RuntimeError(f"Failed to generate a unique filename after {max_attempts} attempts.")
 
 
 def count_xml_labels(xml_dir, lbl_list):
@@ -99,33 +103,23 @@ def count_xml_labels(xml_dir, lbl_list):
     :param lbl_list: a list of label names to count
     :return: dictionary of labels and their counts
     """
-    # create dictionary from label list and set values to 0
-    # count labels
-    label_counts = {}
-    try:
-        label_counts = dict.fromkeys(lbl_list, 0)
-    except Exception as _err:
-        print(f'error generating dictionary from {lbl_list}: {_err}')
-        traceback.print_tb(_err.__traceback__)
-    else:
-        try:
-            for dir_data in os.walk(xml_dir):
-                dir_path, folders, files = dir_data
-                for _xml in files:
-                    try:
-                        tree = ElementTree.parse(f'{dir_path}/{_xml}')
-                    except Exception as _err:
-                        print(f'error parsing {_xml}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                    else:
-                        for name in tree.getroot().iter('name'):
-                            if name.text in label_counts:
-                                _count = label_counts[name.text]
-                                _count = _count+1
-                                label_counts.update({f'{name.text}': _count})
-        except Exception as _err:
-            print(f'error walking {xml_dir}: {_err}')
-            traceback.print_tb(_err.__traceback__)
+
+    label_counts = dict.fromkeys(lbl_list, 0)
+
+    for dir_path, _, files in os.walk(xml_dir):
+        for xml_file in files:
+            if not xml_file.lower().endswith('.xml'):
+                continue
+
+            xml_path = os.path.join(dir_path, xml_file)
+            try:
+                tree = ElementTree.parse(xml_path)
+            except ElementTree.ParseError as e:
+                raise ElementTree.ParseError(f'error parsing {xml_file}: {e}')
+
+            for name in tree.getroot().iter('name'):
+                if name.text in label_counts:
+                    label_counts[name.text] += 1
 
     return label_counts
 
@@ -136,39 +130,30 @@ def remove_object_from_xml_files(xml_directory, object_names_set):
     :param xml_directory: directory path for xml files
     :param object_names_set: a set of object names to be removed
     """
-    try:
-        for data in os.walk(xml_directory):
-            dir_path, folders, files = data
-            for xml_file in tqdm.tqdm(files):
-                tree = ElementTree.parse(f'{dir_path}\{xml_file}')
-                try:
-                    tree_root = tree.getroot()
-                except Exception as _err:
-                    print(f'error getting root from {xml_file}: {_err}')
-                    traceback.print_tb(_err.__traceback__)
-                    sys.exit(1)
-                else:
-                    objects = tree.findall("object")
-                    for name in object_names_set:
-                        for obj in objects:
-                            # print(obj.find('name').text)
-                            if obj.find('name').text == str(name):
-                                try:
-                                    tree_root.remove(obj)
-                                except Exception as _err:
-                                    print(f'error removing {obj} from {tree_root} in {xml_file}: {_err}')
-                                    traceback.print_tb(_err.__traceback__)
-                                    sys.exit(1)
-                    try:
-                        tree.write(f'{dir_path}\{xml_file}')
-                    except Exception as _err:
-                        print(f'error writing {xml_file}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-    except Exception as _err:
-        print(f'error parsing {xml_directory}: {_err}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
+    for dir_path, _, files in os.walk(xml_directory):
+        for xml_file in tqdm.tqdm(files):
+            xml_path = os.path.join(dir_path, xml_file)
+            if not xml_file.lower().endswith('.xml'):
+                continue
+
+            try:
+                tree = ElementTree.parse(xml_path)
+                tree_root = tree.getroot()
+                objects = tree_root.findall("object")
+
+                for obj in objects:
+                    if obj.find('name').text in object_names_set:
+                        tree_root.remove(obj)
+
+                tree.write(xml_path)
+
+            except ElementTree.ParseError as e:
+                print(f"Error parsing {xml_file}: {e}")
+                sys.exit(1)
+            except Exception as e:
+                print(f"Error processing {xml_file}: {e}")
+                traceback.print_tb(e.__traceback__)
+                sys.exit(1)
 
 
 def fix_missing_xml_object_name(xml_directory, label_text):
@@ -179,33 +164,30 @@ def fix_missing_xml_object_name(xml_directory, label_text):
     :param label_text: label to replace object name with
     """
 
-    for data in os.walk(xml_directory):
-        dir_path, folders, files = data
+    for dir_path, _, files in os.walk(xml_directory):
         for xml_file in tqdm.tqdm(files):
+            xml_path = os.path.join(dir_path, xml_file)
+            if not xml_file.lower().endswith('.xml'):
+                continue
+
             try:
-                tree = ElementTree.parse(f'{dir_path}\{xml_file}')
-            except Exception as _err:
-                print(f'error parsing {xml_file}: {_err}')
-                traceback.print_tb(_err.__traceback__)
+                tree = ElementTree.parse(xml_path)
+                objects = tree.findall("object")
+
+                for obj in objects:
+                    class_name = obj.find('name')
+                    if class_name is not None and class_name.text is None:
+                        class_name.text = label_text
+
+                tree.write(xml_path)
+
+            except ElementTree.ParseError as e:
+                print(f"Error parsing {xml_file}: {e}")
                 sys.exit(1)
-            else:
-                try:
-                    objects = tree.findall("object")
-                    for obj in objects:
-                        class_name = obj.find('name')
-                        if class_name.text is None:
-                            class_name.text = label_text
-                except Exception as _err:
-                    print(f'error editing objects in {xml_file}: {_err}')
-                    traceback.print_tb(_err.__traceback__)
-                    sys.exit(1)
-                else:
-                    try:
-                        tree.write(f'{dir_path}\{xml_file}')
-                    except Exception as _err:
-                        print(f'error writing {xml_file}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
+            except Exception as e:
+                print(f"Error processing {xml_file}: {e}")
+                traceback.print_tb(e.__traceback__)
+                sys.exit(1)
 
 
 def replace_xml_file_information(xml_file, replace_dict):
@@ -216,20 +198,22 @@ def replace_xml_file_information(xml_file, replace_dict):
     """
     try:
         tree = ElementTree.parse(xml_file)
-    except Exception as _err:
-        print(f'error parsing {xml_file}: {_err}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
-    else:
+        root = tree.getroot()
+
         for key, value in replace_dict.items():
-            for name in tree.getroot().iterfind(key):
-                name.text = value
-        try:
-            tree.write(xml_file)
-        except Exception as _err:
-            print(f'error writing {xml_file}: {_err}')
-            traceback.print_tb(_err.__traceback__)
-            sys.exit(1)
+            elements = root.findall(key)
+            for elem in elements:
+                elem.text = value
+
+        tree.write(xml_file)
+
+    except ElementTree.ParseError as e:
+        print(f"Error parsing {xml_file}: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error processing {xml_file}: {e}")
+        traceback.print_tb(e.__traceback__)
+        sys.exit(1)
 
 
 def generate_negative_data_set(existing_names, negative_images, negative_output_dir, xml_template):
@@ -241,52 +225,52 @@ def generate_negative_data_set(existing_names, negative_images, negative_output_
     :param negative_output_dir: folder to output the negative data set (jpg & xml)
     :param xml_template: negative xml template to use
     """
-    print('generating negative data set..')
-    try:
-        for data in os.walk(negative_images):
-            dir_path, folders, files = data
-            for image_file in tqdm.tqdm(files):
-                if image_file.endswith('.jpg'):
-                    try:
-                        img = Image.open(f'{dir_path}\{image_file}')
-                    except Exception as _err:
-                        print(f'error opening negative image: {image_file}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-                    else:
-                        width, height = img.size
-                        filename = get_new_file_name(existing_names)
-                        existing_names.add(filename)
-                        image_name = f'{filename}.jpg'
-                        image_path = f'{dir_path}\{image_file}'
-                        image_out_path = f'{negative_output_dir}\{image_name}'
-                        xml_file = f'{filename}.xml'
-                        xml_path = f'{negative_output_dir}\{xml_file}'
-                        replace_dict = {'filename': str(image_name),
-                                        'path': str(image_name),
-                                        'width': str(width),
-                                        'height': str(height),
-                                        'xmax': str(width),
-                                        'ymax': str(height)}
-                        try:
-                            shutil.copy(image_path, image_out_path)
-                        except Exception as _err:
-                            print(f'error copying {image_file} to {negative_output_dir}: {_err}')
-                            traceback.print_tb(_err.__traceback__)
-                            sys.exit(1)
-                        try:
-                            shutil.copy(xml_template, xml_path)
-                        except Exception as _err:
-                            print(f'error copying {xml_template} to {negative_output_dir}: {_err}')
-                            traceback.print_tb(_err.__traceback__)
-                            sys.exit(1)
-                        else:
-                            replace_xml_file_information(xml_path, replace_dict)
-    except Exception as _err:
-        print(f'error walking negatives directory: {_err}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
-    print(f'..negative data set generated in {negative_output_dir} directory')
+    print('Generating negative data set...')
+
+    for dir_path, _, files in os.walk(negative_images):
+        for image_file in tqdm.tqdm(files):
+            file_ext = image_file.lower().split('.')[-1]
+            if file_ext not in ['jpg', 'jpeg']:
+                continue
+
+            try:
+                # process image
+                img_path = os.path.join(dir_path, image_file)
+                img = Image.open(img_path)
+                width, height = img.size
+            except IOError as e:
+                raise IOError(f'error opening {image_file}: {e}')
+
+            try:
+                # generate new filename and prepare file paths
+                filename = get_new_file_name(existing_names)
+                existing_names.add(filename)
+                image_name = f'{filename}.{file_ext}'
+                image_out_path = os.path.join(negative_output_dir, image_name)
+                xml_file = f'{filename}.xml'
+                xml_path = os.path.join(negative_output_dir, xml_file)
+
+                # copy image and XML template
+                shutil.copy(img_path, image_out_path)
+                shutil.copy(xml_template, xml_path)
+            except IOError as e:
+                raise IOError(f'error copying {image_file} to {negative_output_dir}: {e}')
+
+            try:
+                # replace information in XML
+                replace_dict = {
+                    'filename': image_name,
+                    'path': image_name,
+                    'width': str(width),
+                    'height': str(height),
+                    'xmax': str(width),
+                    'ymax': str(height)
+                }
+                replace_xml_file_information(xml_path, replace_dict)
+            except ElementTree.ParseError as e:
+                raise ElementTree.ParseError(f'error parsing {xml_file}: {e}')
+
+    print(f'..Negative data set generated in {negative_output_dir} directory')
 
 
 def collect_current_data_set(data_set_path, jpg_dir, annotations_dir):
@@ -297,34 +281,29 @@ def collect_current_data_set(data_set_path, jpg_dir, annotations_dir):
     :param annotations_dir: output annotations directory
     :return: list of unique file names in the data set that has been collected
     """
-    print('collecting current data set..')
-    existing_names = set({})
-    try:
-        for data in os.walk(data_set_path):
-            dir_path, folders, files = data
-            for img in tqdm.tqdm(files):
-                if img.endswith('.jpg'):
-                    filename = f'{img.rsplit(".", 1)[0]}'
-                    xml_filename = f'{filename}.xml'
-                    existing_names.add(filename)
-                    # copy jpg to JPGImages folder and xml to Annotations folder
-                    try:
-                        shutil.copy(f'{dir_path}\{img}', jpg_dir)
-                    except Exception as _err:
-                        print(f'error copying {img} to {jpg_dir}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-                    try:
-                        shutil.copy(f'{dir_path}\{xml_filename}', annotations_dir)
-                    except Exception as _err:
-                        print(f'error copying {xml_filename} to {annotations_dir}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-    except Exception as _err:
-        print(f'error walking directory: {data_set_path}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
-    print('..finished collecting current data set')
+    print('Collecting current data set...')
+    existing_names = set()
+
+    for dir_path, _, files in os.walk(data_set_path):
+        for file in tqdm.tqdm(files):
+            file_ext = file.lower().split('.')[-1]  # last element of the split is the file extension
+            if file_ext not in ['jpg', 'jpeg']:
+                continue
+
+            filename, _ = os.path.splitext(file)
+            existing_names.add(filename)
+
+            jpg_path = os.path.join(dir_path, file)
+            xml_file = f'{filename}.xml'
+            xml_path = os.path.join(dir_path, xml_file)
+
+            try:
+                shutil.copy(jpg_path, os.path.join(jpg_dir, file))
+                shutil.copy(xml_path, os.path.join(annotations_dir, xml_file))
+            except IOError as e:
+                raise IOError(f'error copying {file} to {jpg_dir} or {annotations_dir}: {e}')
+
+    print('..Finished collecting current data set')
     return existing_names
 
 
@@ -335,40 +314,43 @@ def generate_txt_files(jpg_dir, txt_dir, split_percentage):
     :param txt_dir: output txt directory
     :param split_percentage: split percentage for test and validation sets (recommended 20)
     """
-    print('generating txt files..')
+    print('Generating txt files...')
+
     try:
-        jpeg_names = os.listdir(path=jpg_dir)
-    except Exception as _err:
-        print(f'error listing {jpg_dir}: {_err}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
-    else:
-        # split the list into a training list and a split_set list
-        # by default takes 80 percent for train and  20 percent for test/validation
-        split_set, train_set = partition_list(list_to_split=jpeg_names, percent=split_percentage, shuffle=True)
-        print(f'split_test count: {len(split_set)}')
-        print(f'train_set count: {len(train_set)}')
+        jpeg_names = [file for file in os.listdir(jpg_dir) if file.lower().endswith('.jpg')]
+    except OSError as e:
+        raise OSError(f"error listing {jpg_dir}: {e}")
 
-        # split the split_set list into validation and test lists
-        # by default it splits in half
-        test_set, val_set = split_list_in_half(list_to_split=split_set)
-        print(f'test_set count: {len(test_set)}')
-        print(f'val_set count: {len(val_set)}')
+    # split the list into training list and split_set list
+    try:
+        split_set, train_set = partition_list(jpeg_names, split_percentage, shuffle=True)
+        print(f'Split test count: {len(split_set)}')
+        print(f'Train set count: {len(train_set)}')
+    except ValueError as e:
+        raise ValueError(f"error partitioning list: {e}")
 
-        print('writing txt files..')
+    # split the split_set list into validation and test lists
+    test_set, val_set = split_list_in_half(split_set)
+    print(f'Test set count: {len(test_set)}')
+    print(f'Validation set count: {len(val_set)}')
 
-        train_txt_file = 'train.txt'
-        test_txt_file = 'test.txt'
-        validation_txt_file = 'val.txt'
-        trainval_txt_file = 'trainval.txt'
+    print('Writing txt files...')
 
-        write_to_txt_file(filename=f'{txt_dir}\{train_txt_file}', set_to_write=train_set, existing=False)
-        write_to_txt_file(filename=f'{txt_dir}\{test_txt_file}', set_to_write=test_set, existing=False)
-        write_to_txt_file(filename=f'{txt_dir}\{validation_txt_file}', set_to_write=val_set, existing=False)
-        write_to_txt_file(filename=f'{txt_dir}\{trainval_txt_file}', set_to_write=train_set, existing=False)
-        write_to_txt_file(filename=f'{txt_dir}\{trainval_txt_file}', set_to_write=val_set, existing=True)
+    file_mappings = {
+        'train.txt': (train_set, False),
+        'test.txt': (test_set, False),
+        'val.txt': (val_set, False),
+        'trainval.txt': (train_set, False),  # first write with train_set
+        'trainval.txt': (val_set, True)  # then append with val_set
+    }
 
-        print(f'..all txt files saved in: {txt_dir}')
+    for filename, (set_to_write, is_existing) in file_mappings.items():
+        try:
+            write_to_txt_file(os.path.join(txt_dir, filename), set_to_write, existing=is_existing)
+        except IOError as e:
+            raise IOError(f"Error writing to {filename}: {e}")
+
+    print(f'..All txt files saved in: {txt_dir}')
 
 
 def inject_negative_data_set(negatives_dir, jpg_dir, annotations_dir, txt_dir, val_test_percentage):
@@ -380,33 +362,33 @@ def inject_negative_data_set(negatives_dir, jpg_dir, annotations_dir, txt_dir, v
     :param txt_dir: output txt directory
     :param val_test_percentage: split percentage for test and validation sets (recommended 20)
     """
-    print('injecting negative data set..')
+    print('Injecting negative data set...')
+
+    for dirpath, _, files in os.walk(negatives_dir):
+        for file in files:
+            file_ext = file.lower().split('.')[-1]
+            if file_ext in ['jpg', 'jpeg']:
+                destination = os.path.join(jpg_dir, file)
+            elif file_ext == 'xml':
+                destination = os.path.join(annotations_dir, file)
+            else:
+                print(f'File is neither .jpg, .jpeg nor .xml: {file}')
+                continue
+
+            source_path = os.path.join(dirpath, file)
+
+            try:
+                shutil.copy(source_path, destination)
+            except IOError as e:
+                raise IOError(f'error copying {file} to {destination}: {e}')
     try:
-        for data in os.walk(negatives_dir):
-            dir_path, folder, files = data
-            for _file in files:
-                if _file.endswith('.jpg'):
-                    try:
-                        shutil.copy(f'{dir_path}\{_file}', jpg_dir)
-                    except Exception as _err:
-                        print(f'error copying {dir_path}{_file} to {jpg_dir}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-                elif _file.endswith('.xml'):
-                    try:
-                        shutil.copy(f'{dir_path}\{_file}', annotations_dir)
-                    except Exception as _err:
-                        print(f'error copying {dir_path}{_file} to {annotations_dir}: {_err}')
-                        traceback.print_tb(_err.__traceback__)
-                        sys.exit(1)
-                else:
-                    print(f'file is neither .jpg nor .xml: {_file}')
-    except Exception as _err:
-        print(f'error walking directory: {negatives_dir}')
-        traceback.print_tb(_err.__traceback__)
+        generate_txt_files(jpg_dir, txt_dir, val_test_percentage)
+    except Exception as e:
+        print(f'error generating txt files: {e}')
+        traceback.print_tb(e.__traceback__)
         sys.exit(1)
-    generate_txt_files(jpg_dir, txt_dir, val_test_percentage)
-    print('..finished injecting negative data set into current data set')
+
+    print('..Finished injecting negative data set into current data set')
 
 
 def prepare_voc(input_directory, image_directory, annotations_directory, existing_names):
@@ -418,43 +400,33 @@ def prepare_voc(input_directory, image_directory, annotations_directory, existin
     :param annotations_directory: output directory for annotations
     :param existing_names: set containing current filenames
     """
-    try:
-        for data in os.walk(input_directory):
-            dir_path, folders, files = data
+    for dir_path, _, files in os.walk(input_directory):
+        for file_name in tqdm.tqdm(files):
+            if file_name.lower().endswith('.png'):
+                filename_no_ext = file_name.rsplit(".", 1)[0]
+                xml_file_name = f'{filename_no_ext}.xml'
 
-            for i in tqdm.tqdm(files):
-                # only process .png files
-                if i.endswith('.png'):
-                    _filename = get_new_file_name(existing_names)
-                    if f'{_filename}.xml' not in files:
-                        _xml = f'{i.rsplit(".", 1)[0]}.xml'
-                        if _xml in files and _xml not in existing_names:
-                            try:
-                                _img = Image.open(f'{dir_path}\{i}')
-                            except Exception as _err:
-                                print(f'error opening: {dir_path}\{i}')
-                                traceback.print_tb(_err.__traceback__)
-                                sys.exit(1)
-                            rgb_img = _img.convert('RGB')
-                            try:
-                                rgb_img.save(f'{image_directory}\{_filename}.jpg')
-                            except Exception as _err:
-                                print(f'error saving: {image_directory}\{_filename}.jpg')
-                                traceback.print_tb(_err.__traceback__)
-                                sys.exit(1)
-                            _replace_dict = {'filename': f'{_filename}.jpg',
-                                             'path': f'{_filename}.jpg'}
-                            replace_xml_file_information(xml_file=f'{input_directory}\{_xml}',
-                                                         replace_dict=_replace_dict)
-                            try:
-                                shutil.copy(f'{dir_path}\{_xml}', f'{annotations_directory}\{_filename}.xml')
-                            except Exception as _err:
-                                print(f'error copying {dir_path}\{_xml} to {annotations_directory}')
-                                traceback.print_tb(_err.__traceback__)
-                                sys.exit(1)
-                            existing_names.add(files.index(_xml))
-                            existing_names.add(_filename)
-    except Exception as _err:
-        print(f'error walking directory: {input_directory}')
-        traceback.print_tb(_err.__traceback__)
-        sys.exit(1)
+                if xml_file_name in files and xml_file_name not in existing_names:
+                    new_filename = get_new_file_name(existing_names)
+
+                    # process and save the image
+                    img_path = os.path.join(dir_path, file_name)
+                    try:
+                        img = Image.open(img_path).convert('RGB')
+                        img.save(os.path.join(image_directory, f'{new_filename}.jpg'))
+                    except IOError as e:
+                        raise IOError(f"Error processing image {file_name}: {e}")
+
+                    # update XML file information
+                    xml_input_path = os.path.join(input_directory, xml_file_name)
+                    replace_dict = {'filename': f'{new_filename}.jpg',
+                                    'path': f'{new_filename}.jpg'}
+                    replace_xml_file_information(xml_input_path, replace_dict)
+
+                    # copy XML file
+                    try:
+                        shutil.copy(xml_input_path, os.path.join(annotations_directory, f'{new_filename}.xml'))
+                    except IOError as e:
+                        raise IOError(f"Error copying XML file {xml_file_name}: {e}")
+
+                    existing_names.add(new_filename)
