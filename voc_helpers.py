@@ -17,11 +17,11 @@ from PIL import Image
 
 
 def get_time_date():
-    _now = datetime.datetime.now()
-    time_stamp = datetime.timedelta(minutes=_now.minute,
-                                    seconds=_now.second,
-                                    hours=_now.hour)
-    date = _now.date()
+    timestamp_now = datetime.datetime.now()
+    time_stamp = datetime.timedelta(minutes=timestamp_now.minute,
+                                    seconds=timestamp_now.second,
+                                    hours=timestamp_now.hour)
+    date = timestamp_now.date()
     return time_stamp, date
 
 
@@ -403,34 +403,34 @@ def prepare_voc(input_directory, image_directory, annotations_directory, existin
     """
     for dir_path, _, files in os.walk(input_directory):
         for file_name in tqdm.tqdm(files):
-            if file_name.lower().endswith('.png'):
-                filename_no_ext = file_name.rsplit(".", 1)[0]
+            filename_no_ext, file_ext = os.path.splitext(file_name)
+            file_ext = file_ext.lower()
+
+            if file_ext == '.png':
+                new_filename = get_new_file_name(existing_names)
+                jpg_path = os.path.join(image_directory, f'{new_filename}.jpg')
+                xml_path = os.path.join(annotations_directory, f'{new_filename}.xml')
                 xml_file_name = f'{filename_no_ext}.xml'
+                xml_input_path = os.path.join(dir_path, xml_file_name)
 
-                if xml_file_name in files and xml_file_name not in existing_names:
-                    new_filename = get_new_file_name(existing_names)
+                try:
+                    # convert PNG to JPG
+                    with Image.open(os.path.join(dir_path, file_name)) as img:
+                        rgb_img = img.convert('RGB')
+                        rgb_img.save(jpg_path)
 
-                    # process and save the image
-                    img_path = os.path.join(dir_path, file_name)
-                    try:
-                        img = Image.open(img_path).convert('RGB')
-                        img.save(os.path.join(image_directory, f'{new_filename}.jpg'))
-                    except IOError as e:
-                        raise IOError(f"Error processing image {file_name}: {e}")
+                    # update and copy XML file if it exists and has not been copied yet
+                    if xml_file_name in files and xml_file_name not in existing_names:
+                        replace_dict = {'filename': f'{new_filename}.jpg', 'path': f'{new_filename}.jpg'}
 
-                    # update XML file information
-                    xml_input_path = os.path.join(input_directory, xml_file_name)
-                    replace_dict = {'filename': f'{new_filename}.jpg',
-                                    'path': f'{new_filename}.jpg'}
-                    try:
-                        replace_xml_file_information(xml_input_path, replace_dict)
-                    except Exception as e:
-                        raise Exception(f"Error processing {xml_file_name}: {e}")
+                        try:
+                            replace_xml_file_information(xml_input_path, replace_dict)
+                        except Exception as e:
+                            raise Exception(f"Error replacing xml file information {xml_file_name}: {e}")
 
-                    # copy XML file
-                    try:
-                        shutil.copy(xml_input_path, os.path.join(annotations_directory, f'{new_filename}.xml'))
-                    except IOError as e:
-                        raise IOError(f"Error copying XML file {xml_file_name}: {e}")
+                        shutil.copy(xml_input_path, xml_path)
 
                     existing_names.add(new_filename)
+
+                except IOError as e:
+                    raise IOError(f"Error processing file {file_name}: {e}")

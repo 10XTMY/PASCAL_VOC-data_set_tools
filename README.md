@@ -15,7 +15,7 @@ Yes, you can move on to bigger better solutions, but there is something about Da
 1)
   - Outputs .png and .xml files into one folder
   - No training splits, no text files
-  - Occasionally labels can accidently exported as empty if user miss-clicks while labelling
+  - Occasionally labels can be accidentally exported as empty if user miss-clicks while labelling
   - Filenames will cause conflicts when adding new data in the future
   - Blank labels will cause fatal crashes when attempting to train the model
 
