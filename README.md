@@ -1,6 +1,6 @@
 # PASCAL_VOC-data_set_tools
 
-- Correct Dark Label VOC datasets for nvidia jetson inference training.
+- Prepare Dark Label VOC datasets for nvidia jetson inference training.
 - Inject new data sets into existing ones.
 - Generate and inject negative data sets into an existing VOC set.
 
@@ -8,7 +8,7 @@ Dark Label is a quick and easy tool for labelling video footage for training obj
 
 However, when exporting to PASCAL VOC, the data set exported is not actually in the format of PASCAL VOC and if you are handling a large amount of data, and adding to your data sets as time goes by, it proves a nightmare.
 
-Yes, you can move on to bigger better solutions, but there is something about Dark Label being so quick to setup and use that made me stick with it, so I wrote some tools to sort out my data sets instead.
+Yes, you can move on to bigger better solutions, but there is something about Dark Label being so quick to set up, so I wrote some tools to sort out my data sets instead.
 
 ### The Problems:
 
@@ -57,13 +57,13 @@ Run: `py prepare_dataset.py --drk_lbl_voc`
 
 Run: `py prepare_dataset.py --gen_neg`
 
-If you have the rotten luck of accidently exporting a load of files with blank labels you can fix them using a function in voc_helpers.py called fix_missing_xml_object_name(xml_directory, label_text). Feed it the xml directory and the label to place in any blank object name spaces.
+If you have the rotten luck of accidentally exporting a load of files with blank labels you can fix them using a function in voc_helpers.py called fix_missing_xml_object_name(xml_directory, label_text). Feed it the xml directory and the label to place in any blank object name spaces.
 
 If you need to remove a label from a data set you can use another function in voc_helpers.py called remove_object_from_xml_files(xml_directory, object_names_set). Feed it the directory and a set of object names to remove.
 
 ## Video Demonstration:
 
-[<img src="https://img.youtube.com/vi/rEyfXz5ceAk/maxresdefault.jpg" width="50%">](https://youtu.be/rEyfXz5ceAk)
+[<img src="https://img.youtube.com/vi/g5j649NpJOA/maxresdefault.jpg" width="50%">](https://www.youtube.com/watch?v=g5j649NpJOA)
 
 [ @10XTMY, molmez.io ]
 

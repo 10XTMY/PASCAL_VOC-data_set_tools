@@ -84,8 +84,8 @@ INJECT_NEGATIVES = args.gen_neg
 
 if __name__ == "__main__":
 
-    if not PREPARE_VOC_FROM_DARK_LABEL and not INJECT_NEGATIVES:
-        print('no action selected, exiting program.')
+    if PREPARE_VOC_FROM_DARK_LABEL == INJECT_NEGATIVES:
+        print('Please select either --drk_lbl_voc or --gen_neg.')
         sys.exit(0)
 
     if PREPARE_VOC_FROM_DARK_LABEL:
